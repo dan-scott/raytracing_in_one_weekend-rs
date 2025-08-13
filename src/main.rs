@@ -1,14 +1,14 @@
 mod color;
 mod ray;
 mod vec3;
+mod hittable;
 
-use std::env::args;
-use std::fs::File;
 use crate::ray::Ray;
 use crate::vec3::{Point3, Vec3};
 use color::Color;
-use std::io;
-use std::io::{Stdout, Write};
+use std::env::args;
+use std::fs::File;
+use std::io::Write;
 
 #[cfg(not(target_os = "windows"))]
 fn get_out_stream() -> Stdout {
@@ -22,7 +22,27 @@ fn get_out_stream() -> File {
 }
 
 fn ray_color(ray: &Ray) -> Color {
-    Color::new(0.0, 0.0, 0.0)
+    let t = hit_sphere((0.0, 0.0, -1.0).into(), 0.5, ray);
+    if t > 0.0 {
+        let n = (ray.at(t) - (0.0, 0.0, -1.0).into()).unit_vector();
+        return 0.5 * (n + Vec3::new(1.0, 1.0, 1.0));
+    }
+    let unit_direction = ray.direction().unit_vector();
+    let t = 0.5 * (unit_direction.y() + 1.0);
+    (1.0 - t) * Color::new(1.0, 1.0, 1.0) + t * Color::new(0.5, 0.7, 1.0)
+}
+
+fn hit_sphere(center: Point3, radius: f64, ray: &Ray) -> f64 {
+    let cq = center - ray.origin();
+    let a = ray.direction().length_squared();
+    let h = ray.direction().dot(&cq);
+    let c = cq.length_squared() - radius.powi(2);
+    let discriminant = h.powi(2) - a * c;
+    if discriminant < 0.0 {
+        -1.0
+    } else {
+        (h - discriminant.sqrt()) / a
+    }
 }
 
 fn main() {

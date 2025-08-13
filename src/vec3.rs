@@ -1,5 +1,5 @@
 use std::fmt::Display;
-use std::ops::{Add, AddAssign, Div, DivAssign, Mul, MulAssign, Sub, SubAssign};
+use std::ops::{Add, AddAssign, Div, DivAssign, Mul, MulAssign, Neg, Sub, SubAssign};
 
 #[derive(Debug, Copy, Clone)]
 pub struct Vec3 {
@@ -106,6 +106,13 @@ impl SubAssign for Vec3 {
         for i in 0..3 {
             self.e[i] -= other.e[i];
         }
+    }
+}
+
+impl Neg for Vec3 {
+    type Output = Vec3;
+    fn neg(self) -> Vec3 {
+        (-self.e[0], -self.e[1], -self.e[2]).into()
     }
 }
 
