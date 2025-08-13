@@ -1,6 +1,8 @@
 use crate::ray::Ray;
 use crate::vec3::Point3;
+use std::rc::Rc;
 
+#[derive(Debug, Copy, Clone)]
 pub struct HitRecord {
     pub p: Point3,
     pub normal: Point3,
@@ -19,10 +21,7 @@ impl HitRecord {
     }
 
     // Convenience to start a builder from the required initial fields
-    pub fn builder(p: Point3, normal: Point3, t: f64) -> HitRecordBuilder {
-        HitRecordBuilder::new(p, normal, t)
-    }
-    
+
     pub fn set_face_normal(&mut self, r: &Ray, outward_normal: &Point3) {
         self.front_face = r.direction().dot(outward_normal) < 0.0;
         self.normal = if self.front_face {
@@ -30,27 +29,6 @@ impl HitRecord {
         } else {
             -*outward_normal
         };
-    }
-}
-
-// A linear/type-state style builder for HitRecord.
-// First provide p, normal, t. Then provide the ray and outward normal to finalize.
-pub struct HitRecordBuilder {
-    p: Point3,
-    normal: Point3,
-    t: f64,
-}
-
-impl HitRecordBuilder {
-    pub fn new(p: Point3, normal: Point3, t: f64) -> Self {
-        HitRecordBuilder { p, normal, t }
-    }
-
-    // Consumes the builder to create a HitRecord and set the face-normal correctly.
-    pub fn with_ray(self, r: &Ray, outward_normal: &Point3) -> HitRecord {
-        let mut rec = HitRecord::new(self.p, self.normal, self.t);
-        rec.set_face_normal(r, outward_normal);
-        rec
     }
 }
 
@@ -100,7 +78,47 @@ impl Hittable for Sphere {
         let outward_normal = (p - self.center) / self.radius;
 
         // Build the record in two steps to ensure face normal is set properly
-        let builder = HitRecord::builder(p, outward_normal, t);
-        Some(builder.with_ray(r, &outward_normal))
+        let mut builder = HitRecord::new(p, outward_normal, t);
+        builder.set_face_normal(r, &outward_normal);
+        Some(builder)
+    }
+}
+
+pub struct HittableList {
+    objects: Vec<Rc<Box<dyn Hittable>>>,
+}
+
+impl HittableList {
+    pub fn new() -> HittableList {
+        HittableList {
+            objects: Vec::new(),
+        }
+    }
+
+    pub fn add(&mut self, object: Rc<Box<dyn Hittable>>) {
+        self.objects.push(object);
+    }
+
+    pub fn clear(&mut self) {
+        self.objects.clear();
+    }
+}
+impl Hittable for HittableList {
+    fn hit(&self, r: &Ray, ray_t_min: f64, ray_t_max: f64) -> Option<HitRecord> {
+        self.objects.iter().fold(None, |prev, object| {
+            let max = prev.clone().map_or(ray_t_max, |prev| prev.t);
+            object.hit(r, ray_t_min, max).or(prev)
+        })
+        // let mut hit_record = None;
+        // let mut closest_so_far = ray_t_max;
+        //
+        // for object in &self.objects {
+        //     if let Some(record) = object.hit(r, ray_t_min, closest_so_far) {
+        //         closest_so_far = record.t;
+        //         hit_record = Some(record);
+        //     }
+        // }
+        //
+        // hit_record
     }
 }

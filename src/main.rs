@@ -1,18 +1,24 @@
 mod color;
+mod hittable;
 mod ray;
 mod vec3;
-mod hittable;
 
+use crate::hittable::{Hittable, HittableList};
 use crate::ray::Ray;
 use crate::vec3::{Point3, Vec3};
 use color::Color;
+#[cfg(target_os = "windows")]
 use std::env::args;
+#[cfg(target_os = "windows")]
 use std::fs::File;
 use std::io::Write;
+#[cfg(not(target_os = "windows"))]
+use std::io::{Stdout, stdout};
+use std::rc::Rc;
 
 #[cfg(not(target_os = "windows"))]
 fn get_out_stream() -> Stdout {
-    io::stdout()
+    stdout()
 }
 
 #[cfg(target_os = "windows")]
@@ -21,34 +27,29 @@ fn get_out_stream() -> File {
     File::create(path).unwrap()
 }
 
-fn ray_color(ray: &Ray) -> Color {
-    let t = hit_sphere((0.0, 0.0, -1.0).into(), 0.5, ray);
-    if t > 0.0 {
-        let n = (ray.at(t) - (0.0, 0.0, -1.0).into()).unit_vector();
-        return 0.5 * (n + Vec3::new(1.0, 1.0, 1.0));
+fn ray_color(ray: &Ray, world: &impl Hittable) -> Color {
+    if let Some(hit) = world.hit(ray, 0.001, f64::INFINITY) {
+        return 0.5 * (hit.normal + Vec3::new(1.0, 1.0, 1.0));
     }
     let unit_direction = ray.direction().unit_vector();
     let t = 0.5 * (unit_direction.y() + 1.0);
     (1.0 - t) * Color::new(1.0, 1.0, 1.0) + t * Color::new(0.5, 0.7, 1.0)
 }
 
-fn hit_sphere(center: Point3, radius: f64, ray: &Ray) -> f64 {
-    let cq = center - ray.origin();
-    let a = ray.direction().length_squared();
-    let h = ray.direction().dot(&cq);
-    let c = cq.length_squared() - radius.powi(2);
-    let discriminant = h.powi(2) - a * c;
-    if discriminant < 0.0 {
-        -1.0
-    } else {
-        (h - discriminant.sqrt()) / a
-    }
-}
-
 fn main() {
     let aspect_ratio: f64 = 16.0 / 9.0;
     let image_width: u32 = 400;
     let image_height: u32 = ((image_width as f64 / aspect_ratio) as u32).max(1);
+
+    let mut world = HittableList::new();
+    world.add(Rc::new(Box::new(hittable::Sphere::new(
+        (0.0, 0.0, -1.0).into(),
+        0.5,
+    ))));
+    world.add(Rc::new(Box::new(hittable::Sphere::new(
+        (0.0, -100.5, -1.0).into(),
+        100.0,
+    ))));
 
     let focal_length = 1.0;
     let viewport_height = 2.0;
@@ -77,11 +78,10 @@ fn main() {
             let ray_direction = pixel_center - camera_center;
             let ray = Ray::new(camera_center, ray_direction);
 
-            let pixel_color = ray_color(&ray);
+            let pixel_color = ray_color(&ray, &world);
             pixel_color.write(&mut out_stream).unwrap()
         }
     }
     eprint!("\rDone.                 \n");
-
     out_stream.flush().unwrap();
 }
