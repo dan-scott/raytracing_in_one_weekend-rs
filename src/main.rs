@@ -2,11 +2,24 @@ mod color;
 mod ray;
 mod vec3;
 
+use std::env::args;
+use std::fs::File;
 use crate::ray::Ray;
 use crate::vec3::{Point3, Vec3};
 use color::Color;
 use std::io;
-use std::io::Write;
+use std::io::{Stdout, Write};
+
+#[cfg(not(target_os = "windows"))]
+fn get_out_stream() -> Stdout {
+    io::stdout()
+}
+
+#[cfg(target_os = "windows")]
+fn get_out_stream() -> File {
+    let path = args().nth(1).unwrap_or_else(|| "output.ppm".to_string());
+    File::create(path).unwrap()
+}
 
 fn ray_color(ray: &Ray) -> Color {
     Color::new(0.0, 0.0, 0.0)
@@ -32,7 +45,9 @@ fn main() {
         camera_center - (0.0, 0.0, focal_length).into() - viewport_u / 2.0 - viewport_v / 2.0;
     let pixel00_loc = viewport_upper_left + 0.5 * (pixel_delta_u + pixel_delta_v);
 
-    print!("P3\n{} {}\n255\n", image_width, image_height);
+    let mut out_stream = get_out_stream();
+
+    write!(out_stream, "P3\n{} {}\n255\n", image_width, image_height).unwrap();
 
     for y in 0..image_height {
         eprint!("\rScanlines remaining: {} ", image_height - y);
@@ -43,10 +58,10 @@ fn main() {
             let ray = Ray::new(camera_center, ray_direction);
 
             let pixel_color = ray_color(&ray);
-            pixel_color.write(&mut io::stdout()).unwrap()
+            pixel_color.write(&mut out_stream).unwrap()
         }
     }
     eprint!("\rDone.                 \n");
 
-    io::stdout().flush().unwrap();
+    out_stream.flush().unwrap();
 }
