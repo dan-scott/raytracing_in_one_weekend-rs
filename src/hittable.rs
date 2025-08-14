@@ -1,3 +1,4 @@
+use crate::interval::Interval;
 use crate::ray::Ray;
 use crate::vec3::Point3;
 use std::rc::Rc;
@@ -33,7 +34,7 @@ impl HitRecord {
 }
 
 pub trait Hittable {
-    fn hit(&self, r: &Ray, t_min: f64, t_max: f64) -> Option<HitRecord>;
+    fn hit(&self, r: &Ray, ray_t: Interval) -> Option<HitRecord>;
 }
 
 pub struct Sphere {
@@ -50,8 +51,14 @@ impl Sphere {
     }
 }
 
+impl Into<Rc<Box<dyn Hittable>>> for Sphere {
+    fn into(self) -> Rc<Box<dyn Hittable>> {
+        Rc::new(Box::new(self))
+    }
+}
+
 impl Hittable for Sphere {
-    fn hit(&self, r: &Ray, ray_min: f64, ray_max: f64) -> Option<HitRecord> {
+    fn hit(&self, r: &Ray, ray_t: Interval) -> Option<HitRecord> {
         let cq = self.center - r.origin();
         let a = r.direction().length_squared();
         let h = r.direction().dot(&cq);
@@ -65,10 +72,9 @@ impl Hittable for Sphere {
 
         let sqrt_d = discriminant.sqrt();
         let mut root = (h - sqrt_d) / a;
-        let range = ray_min..ray_max;
-        if !range.contains(&root) {
+        if !ray_t.contains(root) {
             root = (h + sqrt_d) / a;
-            if !range.contains(&root) {
+            if !ray_t.contains(root) {
                 return None;
             }
         }
@@ -104,21 +110,10 @@ impl HittableList {
     }
 }
 impl Hittable for HittableList {
-    fn hit(&self, r: &Ray, ray_t_min: f64, ray_t_max: f64) -> Option<HitRecord> {
+    fn hit(&self, r: &Ray, ray_t: Interval) -> Option<HitRecord> {
         self.objects.iter().fold(None, |prev, object| {
-            let max = prev.clone().map_or(ray_t_max, |prev| prev.t);
-            object.hit(r, ray_t_min, max).or(prev)
+            let max = prev.clone().map_or(ray_t.max, |prev| prev.t);
+            object.hit(r, Interval::new(ray_t.min, max)).or(prev)
         })
-        // let mut hit_record = None;
-        // let mut closest_so_far = ray_t_max;
-        //
-        // for object in &self.objects {
-        //     if let Some(record) = object.hit(r, ray_t_min, closest_so_far) {
-        //         closest_so_far = record.t;
-        //         hit_record = Some(record);
-        //     }
-        // }
-        //
-        // hit_record
     }
 }
