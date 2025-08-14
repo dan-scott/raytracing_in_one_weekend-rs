@@ -12,11 +12,11 @@ impl Color {
         self.z()
     }
 
-    pub fn write(self, f: &mut impl Write) -> std::io::Result<()> {
-        let (r, g, b) = self.tuple();
-        let rb = (255.999 * r).floor() as u8;
-        let gb = (255.999 * g).floor() as u8;
-        let bb = (255.999 * b).floor() as u8;
+    pub fn write(self, scale: f64, f: &mut impl Write) -> std::io::Result<()> {
+        let (r, g, b) = (self * scale).tuple();
+        let rb = (256.0 * r.clamp(0.0, 0.999)).floor() as u8;
+        let gb = (256.0 * g.clamp(0.0, 0.999)).floor() as u8;
+        let bb = (256.0 * b.clamp(0.0, 0.999)).floor() as u8;
         write!(f, "{} {} {}\n", rb, gb, bb)
     }
 }

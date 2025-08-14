@@ -4,6 +4,7 @@ mod ray;
 mod vec3;
 mod interval;
 mod camera;
+mod utils;
 
 use crate::hittable::{Hittable, HittableList, Sphere};
 use crate::ray::Ray;
@@ -41,6 +42,7 @@ fn main() {
     let mut cam = Camera::default();
     cam.aspect_ratio = 16.0 / 9.0;
     cam.image_width = 400;
+    cam.samples_per_pixel = 100;
 
     cam.render(&world, &mut out_stream).unwrap();
     
