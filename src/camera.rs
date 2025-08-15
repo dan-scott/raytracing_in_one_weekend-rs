@@ -4,12 +4,14 @@ use crate::interval::Interval;
 use crate::ray::Ray;
 use crate::vec3::{Point3, Vec3};
 use rand::Rng;
+use rand::rngs::ThreadRng;
 use std::io::Write;
 
 pub struct Camera {
     pub aspect_ratio: f64,
     pub image_width: u32,
     pub samples_per_pixel: u32,
+    pub max_depth: u32,
 
     image_height: u32,
     center: Point3,
@@ -26,6 +28,7 @@ impl Default for Camera {
             image_width: 100,
             samples_per_pixel: 10,
             pixel_samples_scale: 1.0,
+            max_depth: 10,
             image_height: 0,
             center: Point3::zero(),
             pixel00_loc: Point3::zero(),
@@ -38,6 +41,7 @@ impl Default for Camera {
 impl Camera {
     pub fn render(&mut self, world: &dyn Hittable, out: &mut impl Write) -> anyhow::Result<()> {
         self.initialize();
+        let mut rng = rand::rng();
 
         write!(out, "P3\n{} {}\n255\n", self.image_width, self.image_height)?;
 
@@ -46,8 +50,8 @@ impl Camera {
             for x in 0..self.image_width {
                 let mut pixel_color = Color::zero();
                 for _ in 0..self.samples_per_pixel {
-                    let ray = self.get_ray(x as f64, y as f64);
-                    pixel_color += Camera::ray_color(&ray, world);
+                    let ray = self.get_ray(&mut rng, x as f64, y as f64);
+                    pixel_color += Camera::ray_color(&mut rng, &ray, self.max_depth, world);
                 }
 
                 pixel_color.write(self.pixel_samples_scale, out)?
@@ -60,8 +64,8 @@ impl Camera {
 }
 
 impl Camera {
-    fn get_ray(&self, x: f64, y: f64) -> Ray {
-        let offset = Camera::sample_offset();
+    fn get_ray(&self, rng: &mut ThreadRng, x: f64, y: f64) -> Ray {
+        let offset = Camera::sample_offset(rng);
         let pixel_sample = self.pixel00_loc
             + ((x + offset.x()) * self.pixel_delta_u)
             + ((y + offset.y()) * self.pixel_delta_v);
@@ -70,18 +74,22 @@ impl Camera {
         Ray::new(ray_origin, ray_direction)
     }
 
-    fn sample_offset() -> Vec3 {
-        let mut rng = rand::rng();
+    fn sample_offset(rng: &mut ThreadRng) -> Vec3 {
         Vec3::new(
-            rng.random::<f64>() - 0.5,
-            rng.random::<f64>() - 0.5,
+            rng.random_range(-0.5..0.5),
+            rng.random_range(-0.5..0.5),
             0.0,
         )
     }
 
-    fn ray_color(r: &Ray, world: &dyn Hittable) -> Color {
-        if let Some(rec) = world.hit(r, Interval::new(0.0, f64::INFINITY)) {
-            0.5 * (rec.normal + (1.0, 1.0, 1.0).into())
+    fn ray_color(rng: &mut ThreadRng, r: &Ray, depth: u32, world: &dyn Hittable) -> Color {
+        if depth <= 0 {
+            return Color::zero();
+        }
+
+        if let Some(rec) = world.hit(r, Interval::new(0.001, f64::INFINITY)) {
+            let direction = Vec3::random_on_hemisphere(rng, &rec.normal);
+            0.5 * Self::ray_color(rng, &Ray::new(rec.p, direction), depth - 1, world)
         } else {
             let unit_direction = r.direction().unit_vector();
             let a = 0.5 * (unit_direction.y() + 1.0);

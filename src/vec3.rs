@@ -1,5 +1,8 @@
+use rand::Rng;
+use rand::prelude::ThreadRng;
 use std::fmt::Display;
-use std::ops::{Add, AddAssign, Div, DivAssign, Mul, MulAssign, Neg, Sub, SubAssign};
+use std::ops::{Add, AddAssign, Div, DivAssign, Mul, MulAssign, Neg, Range, Sub, SubAssign};
+use std::thread::Thread;
 
 #[derive(Debug, Copy, Clone)]
 pub struct Vec3 {
@@ -15,6 +18,37 @@ impl Vec3 {
 
     pub fn new(x: f64, y: f64, z: f64) -> Vec3 {
         Vec3 { e: [x, y, z] }
+    }
+
+    pub fn random(rng: &mut ThreadRng) -> Vec3 {
+        Self::new(rng.random(), rng.random(), rng.random())
+    }
+
+    pub fn random_range(rng: &mut ThreadRng, range: Range<f64>) -> Vec3 {
+        Self::new(
+            rng.random_range(range.clone()),
+            rng.random_range(range.clone()),
+            rng.random_range(range),
+        )
+    }
+
+    pub fn random_unit_vector(rng: &mut ThreadRng) -> Vec3 {
+        loop {
+            let p = Self::random_range(rng, -1.0..1.0);
+            let len_sq = p.length_squared();
+            if 1e-160 < len_sq && len_sq <= 1.0 {
+                return p / len_sq.sqrt();
+            }
+        }
+    }
+
+    pub fn random_on_hemisphere(rng: &mut ThreadRng, normal: &Vec3) -> Vec3 {
+        let on_unit_sphere = Self::random_unit_vector(rng);
+        if on_unit_sphere.dot(normal) > 0.0 {
+            on_unit_sphere
+        } else {
+            -on_unit_sphere
+        }
     }
 
     pub fn x(&self) -> f64 {
@@ -40,7 +74,7 @@ impl Vec3 {
     }
 
     pub fn dot(&self, other: &Vec3) -> f64 {
-        self.e.iter().zip(other.e.iter()).map(|(x, y)| x * y).sum()
+        self.e[0] * other.e[0] + self.e[1] * other.e[1] + self.e[2] * other.e[2]
     }
 
     pub fn cross(&self, other: &Vec3) -> Vec3 {

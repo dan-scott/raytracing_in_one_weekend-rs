@@ -21,8 +21,6 @@ impl HitRecord {
         }
     }
 
-    // Convenience to start a builder from the required initial fields
-
     pub fn set_face_normal(&mut self, r: &Ray, outward_normal: &Point3) {
         self.front_face = r.direction().dot(outward_normal) < 0.0;
         self.normal = if self.front_face {
@@ -59,10 +57,10 @@ impl Into<Rc<Box<dyn Hittable>>> for Sphere {
 
 impl Hittable for Sphere {
     fn hit(&self, r: &Ray, ray_t: Interval) -> Option<HitRecord> {
-        let cq = self.center - r.origin();
+        let oc = self.center - r.origin();
         let a = r.direction().length_squared();
-        let h = r.direction().dot(&cq);
-        let c = cq.length_squared() - self.radius.powi(2);
+        let h = r.direction().dot(&oc);
+        let c = oc.length_squared() - self.radius.powi(2);
 
         let discriminant = h.powi(2) - a * c;
 
@@ -72,9 +70,9 @@ impl Hittable for Sphere {
 
         let sqrt_d = discriminant.sqrt();
         let mut root = (h - sqrt_d) / a;
-        if !ray_t.contains(root) {
+        if !ray_t.surrounds(root) {
             root = (h + sqrt_d) / a;
-            if !ray_t.contains(root) {
+            if !ray_t.surrounds(root) {
                 return None;
             }
         }
@@ -84,9 +82,9 @@ impl Hittable for Sphere {
         let outward_normal = (p - self.center) / self.radius;
 
         // Build the record in two steps to ensure face normal is set properly
-        let mut builder = HitRecord::new(p, outward_normal, t);
-        builder.set_face_normal(r, &outward_normal);
-        Some(builder)
+        let mut rec = HitRecord::new(p, outward_normal, t);
+        rec.set_face_normal(r, &outward_normal);
+        Some(rec)
     }
 }
 
